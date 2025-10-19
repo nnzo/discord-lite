@@ -36,6 +36,24 @@ pub struct Message {
     pub timestamp: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GuildFolder {
+    #[serde(default)]
+    pub guild_ids: Vec<String>,
+    #[serde(default)]
+    pub id: Option<serde_json::Value>,
+    #[serde(default)]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserSettings {
+    #[serde(default)]
+    pub guild_positions: Vec<String>,
+    #[serde(default)]
+    pub guild_folders: Vec<GuildFolder>,
+}
+
 #[derive(Debug, Serialize)]
 struct SendMessagePayload {
     content: String,
@@ -60,23 +78,90 @@ pub async fn verify_token(token: String) -> Result<User, String> {
         .map_err(|e| format!("Failed to parse user: {}", e))
 }
 
-pub async fn fetch_guilds(token: String) -> Result<Vec<Guild>, String> {
+pub async fn fetch_user_settings(token: String) -> Result<UserSettings, String> {
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/users/@me/guilds", API_BASE))
+        .get(format!("{}/users/@me/settings", API_BASE))
         .header("Authorization", token)
         .send()
         .await
         .map_err(|e| format!("Network error: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Failed to fetch guilds: {}", response.status()));
+        return Err(format!(
+            "Failed to fetch user settings: {}",
+            response.status()
+        ));
     }
 
     response
-        .json::<Vec<Guild>>()
+        .json::<UserSettings>()
         .await
-        .map_err(|e| format!("Failed to parse guilds: {}", e))
+        .map_err(|e| format!("Failed to parse user settings: {}", e))
+}
+
+pub async fn fetch_guilds(token: String) -> Result<Vec<Guild>, String> {
+    let client = reqwest::Client::new();
+
+    // Fetch guilds
+    let guilds_response = client
+        .get(format!("{}/users/@me/guilds", API_BASE))
+        .header("Authorization", token.clone())
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !guilds_response.status().is_success() {
+        return Err(format!(
+            "Failed to fetch guilds: {}",
+            guilds_response.status()
+        ));
+    }
+
+    let mut guilds: Vec<Guild> = guilds_response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse guilds: {}", e))?;
+
+    // Debug: Print guild info
+    eprintln!("Fetched {} guilds", guilds.len());
+    for guild in &guilds {
+        eprintln!("Guild: id={}, name={}", guild.id, guild.name);
+    }
+
+    // Fetch user settings to get guild order
+    if let Ok(settings) = fetch_user_settings(token).await {
+        eprintln!("Guild positions: {:?}", settings.guild_positions);
+        eprintln!("Guild folders: {:?}", settings.guild_folders);
+
+        // Build ordered list from guild_folders (newer Discord format)
+        let mut ordered_ids: Vec<String> = Vec::new();
+
+        for folder in &settings.guild_folders {
+            ordered_ids.extend(folder.guild_ids.clone());
+        }
+
+        // If guild_folders is empty, fall back to guild_positions
+        if ordered_ids.is_empty() {
+            ordered_ids = settings.guild_positions.clone();
+        }
+
+        eprintln!("Ordered IDs: {:?}", ordered_ids);
+
+        if !ordered_ids.is_empty() {
+            // Sort guilds based on ordered IDs
+            guilds.sort_by_key(|guild| {
+                ordered_ids
+                    .iter()
+                    .position(|id| id == &guild.id)
+                    .unwrap_or(usize::MAX) // Put guilds not in positions at the end
+            });
+        }
+    } else {
+        eprintln!("Failed to fetch user settings, using default order");
+    }
+
+    Ok(guilds)
 }
 
 pub async fn fetch_channels(token: String, guild_id: String) -> Result<Vec<Channel>, String> {

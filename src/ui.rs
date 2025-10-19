@@ -75,7 +75,13 @@ fn guild_list(state: &AppState) -> Element<AppMessage> {
             .map(|id| id == &guild.id)
             .unwrap_or(false);
 
-        let btn = button(text(&guild.name).size(14))
+        let guild_name = if guild.name.is_empty() {
+            format!("Server ({})", &guild.id[..8])
+        } else {
+            guild.name.clone()
+        };
+
+        let btn = button(text(&guild_name).size(14))
             .on_press(AppMessage::SelectGuild(guild.id.clone()))
             .padding(8)
             .width(Length::Fill);
