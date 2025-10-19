@@ -126,7 +126,14 @@ pub async fn fetch_guilds(token: String) -> Result<Vec<Guild>, String> {
     // Debug: Print guild info
     eprintln!("Fetched {} guilds", guilds.len());
     for guild in &guilds {
-        eprintln!("Guild: id={}, name={}", guild.id, guild.name);
+        eprintln!(
+            "Guild: id={}, name='{}', name_len={}, is_empty={}, is_whitespace={}",
+            guild.id,
+            guild.name,
+            guild.name.len(),
+            guild.name.is_empty(),
+            guild.name.trim().is_empty()
+        );
     }
 
     // Fetch user settings to get guild order

@@ -55,33 +55,36 @@ fn main_view(state: &AppState) -> Element<AppMessage> {
 }
 
 fn guild_list(state: &AppState) -> Element<AppMessage> {
-    let mut guild_column = Column::new().spacing(5).padding(10).width(200);
+    let mut header_column = Column::new().spacing(5).padding(10).width(200);
 
     if let Some(user) = &state.current_user {
-        guild_column = guild_column.push(
+        header_column = header_column.push(
             text(format!("@{}", user.username))
                 .size(14)
                 .style(iced::Color::from_rgb(0.7, 0.7, 0.7)),
         );
-        guild_column = guild_column.push(text("───────────").size(12));
+        header_column = header_column.push(text("───────────").size(12));
     }
 
-    guild_column = guild_column.push(text("Servers").size(18));
+    header_column = header_column.push(text("Servers").size(18));
+
+    // Create scrollable guild list
+    let mut guild_column = Column::new().spacing(5).width(Length::Fill);
 
     for guild in &state.guilds {
+        // Skip guilds with empty or whitespace-only names
+        if guild.name.trim().is_empty() {
+            eprintln!("Warning: Skipping guild with empty name, id={}", guild.id);
+            continue;
+        }
+
         let is_selected = state
             .selected_guild
             .as_ref()
             .map(|id| id == &guild.id)
             .unwrap_or(false);
 
-        let guild_name = if guild.name.is_empty() {
-            format!("Server ({})", &guild.id[..8])
-        } else {
-            guild.name.clone()
-        };
-
-        let btn = button(text(&guild_name).size(14))
+        let btn = button(text(&guild.name).size(14))
             .on_press(AppMessage::SelectGuild(guild.id.clone()))
             .padding(8)
             .width(Length::Fill);
@@ -95,7 +98,13 @@ fn guild_list(state: &AppState) -> Element<AppMessage> {
         guild_column = guild_column.push(btn);
     }
 
-    container(guild_column)
+    let guild_scroll = scrollable(guild_column)
+        .height(Length::Fill)
+        .width(Length::Fill);
+
+    header_column = header_column.push(guild_scroll);
+
+    container(header_column)
         .width(200)
         .height(Length::Fill)
         .style(iced::theme::Container::Box)
@@ -103,7 +112,7 @@ fn guild_list(state: &AppState) -> Element<AppMessage> {
 }
 
 fn channel_list(state: &AppState) -> Element<AppMessage> {
-    let mut channel_column = Column::new().spacing(5).padding(10).width(200);
+    let mut header_column = Column::new().spacing(5).padding(10).width(200);
 
     if state.selected_guild.is_some() {
         let guild_name = state
@@ -113,9 +122,11 @@ fn channel_list(state: &AppState) -> Element<AppMessage> {
             .map(|g| g.name.as_str())
             .unwrap_or("Unknown");
 
-        channel_column = channel_column.push(text(guild_name).size(16));
-        channel_column = channel_column.push(text("───────────").size(12));
-        channel_column = channel_column.push(text("Channels").size(14));
+        header_column = header_column.push(text(guild_name).size(16));
+        header_column = header_column.push(text("───────────").size(12));
+        header_column = header_column.push(text("Channels").size(14));
+
+        let mut channel_column = Column::new().spacing(5).width(Length::Fill);
 
         for channel in &state.channels {
             let is_selected = state
@@ -139,11 +150,17 @@ fn channel_list(state: &AppState) -> Element<AppMessage> {
 
             channel_column = channel_column.push(btn);
         }
+
+        let channel_scroll = scrollable(channel_column)
+            .height(Length::Fill)
+            .width(Length::Fill);
+
+        header_column = header_column.push(channel_scroll);
     } else {
-        channel_column = channel_column.push(text("Select a server").size(14));
+        header_column = header_column.push(text("Select a server").size(14));
     }
 
-    container(channel_column)
+    container(header_column)
         .width(200)
         .height(Length::Fill)
         .style(iced::theme::Container::Box)
