@@ -26,6 +26,10 @@ pub struct Channel {
     pub channel_type: i32,
     #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
+    pub position: i32,
+    #[serde(default)]
+    pub parent_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -189,8 +193,22 @@ pub async fn fetch_channels(token: String, guild_id: String) -> Result<Vec<Chann
         .await
         .map_err(|e| format!("Failed to parse channels: {}", e))?;
 
-    // Filter to only text channels (type 0)
-    channels.retain(|c| c.channel_type == 0);
+    // Debug: Print channel info
+    eprintln!("Fetched {} channels", channels.len());
+    for channel in &channels {
+        eprintln!(
+            "Channel: id={}, name={:?}, type={}, position={}, parent_id={:?}",
+            channel.id, channel.name, channel.channel_type, channel.position, channel.parent_id
+        );
+    }
+
+    // Keep text channels (0), voice channels (2), and categories (4)
+    channels.retain(|c| c.channel_type == 0 || c.channel_type == 2 || c.channel_type == 4);
+
+    // Sort by position to maintain Discord's order
+    channels.sort_by_key(|c| c.position);
+
+    eprintln!("Kept {} channels after filtering", channels.len());
 
     Ok(channels)
 }

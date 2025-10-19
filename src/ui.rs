@@ -126,29 +126,59 @@ fn channel_list(state: &AppState) -> Element<AppMessage> {
         header_column = header_column.push(text("-----------").size(12));
         header_column = header_column.push(text("Channels").size(14));
 
-        let mut channel_column = Column::new().spacing(5).width(Length::Fill);
+        let mut channel_column = Column::new().spacing(3).width(Length::Fill);
 
-        for channel in &state.channels {
-            let is_selected = state
-                .selected_channel
-                .as_ref()
-                .map(|id| id == &channel.id)
-                .unwrap_or(false);
+        // Separate categories and channels
+        let categories: Vec<_> = state
+            .channels
+            .iter()
+            .filter(|c| c.channel_type == 4)
+            .collect();
 
-            let channel_name = channel.name.as_deref().unwrap_or("Unknown");
+        let channels_with_parents: Vec<_> = state
+            .channels
+            .iter()
+            .filter(|c| (c.channel_type == 0 || c.channel_type == 2) && c.parent_id.is_some())
+            .collect();
 
-            let btn = button(text(format!("# {}", channel_name)).size(14))
-                .on_press(AppMessage::SelectChannel(channel.id.clone()))
-                .padding(8)
-                .width(Length::Fill);
+        let channels_without_parents: Vec<_> = state
+            .channels
+            .iter()
+            .filter(|c| (c.channel_type == 0 || c.channel_type == 2) && c.parent_id.is_none())
+            .collect();
 
-            let btn = if is_selected {
-                btn.style(iced::theme::Button::Primary)
-            } else {
-                btn.style(iced::theme::Button::Secondary)
-            };
+        // First, display channels without parents (top-level channels)
+        for channel in &channels_without_parents {
+            channel_column =
+                channel_column.push(render_channel(channel, &state.selected_channel, false));
+        }
 
-            channel_column = channel_column.push(btn);
+        // Then, display categories with their children
+        for category in &categories {
+            let category_name = category.name.as_deref().unwrap_or("Unknown");
+
+            // Display category header
+            channel_column = channel_column.push(
+                container(
+                    text(category_name.to_uppercase())
+                        .size(12)
+                        .style(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                )
+                .padding([8, 8, 2, 8]),
+            );
+
+            // Display channels in this category, sorted by position
+            let mut category_channels: Vec<_> = channels_with_parents
+                .iter()
+                .filter(|c| c.parent_id.as_ref() == Some(&category.id))
+                .collect();
+
+            category_channels.sort_by_key(|c| c.position);
+
+            for channel in category_channels {
+                channel_column =
+                    channel_column.push(render_channel(channel, &state.selected_channel, true));
+            }
         }
 
         let channel_scroll = scrollable(channel_column)
@@ -273,4 +303,53 @@ fn format_timestamp(timestamp: &str) -> String {
         }
     }
     String::new()
+}
+
+fn render_channel<'a>(
+    channel: &'a crate::api::Channel,
+    selected_channel: &'a Option<String>,
+    indented: bool,
+) -> Element<'a, AppMessage> {
+    let channel_name = channel.name.as_deref().unwrap_or("Unknown");
+    let indent = if indented { "  " } else { "" };
+
+    match channel.channel_type {
+        0 => {
+            // Text channel
+            let is_selected = selected_channel
+                .as_ref()
+                .map(|id| id == &channel.id)
+                .unwrap_or(false);
+
+            let btn = button(text(format!("{}# {}", indent, channel_name)).size(14))
+                .on_press(AppMessage::SelectChannel(channel.id.clone()))
+                .padding(8)
+                .width(Length::Fill);
+
+            let btn = if is_selected {
+                btn.style(iced::theme::Button::Primary)
+            } else {
+                btn.style(iced::theme::Button::Secondary)
+            };
+
+            btn.into()
+        }
+        2 => {
+            // Voice channel
+            let btn = button(
+                text(format!("{}🔊 {}", indent, channel_name))
+                    .size(14)
+                    .style(iced::Color::from_rgb(0.7, 0.7, 0.7)),
+            )
+            .padding(8)
+            .width(Length::Fill)
+            .style(iced::theme::Button::Secondary);
+
+            btn.into()
+        }
+        _ => {
+            // Unknown - return empty container
+            container(text("")).into()
+        }
+    }
 }
