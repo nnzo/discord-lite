@@ -29,6 +29,11 @@ pub enum Message {
     MessageInputChanged(String),
     SendMessage,
     MessageSent(Result<(), String>),
+
+    // Status
+    ToggleStatusMenu,
+    ChangeStatus(state::UserStatus),
+    StatusChanged(Result<(), String>),
 }
 
 impl Application for DiscordLite {
@@ -168,6 +173,29 @@ impl Application for DiscordLite {
 
             Message::MessageSent(Err(e)) => {
                 self.state.error = Some(format!("Failed to send message: {}", e));
+                Command::none()
+            }
+
+            Message::ToggleStatusMenu => {
+                self.state.status_menu_open = !self.state.status_menu_open;
+                Command::none()
+            }
+
+            Message::ChangeStatus(new_status) => {
+                self.state.status_menu_open = false;
+                self.state.current_status = new_status;
+
+                let token = self.state.token.clone().unwrap();
+                Command::perform(api::set_status(token, new_status), Message::StatusChanged)
+            }
+
+            Message::StatusChanged(Ok(())) => {
+                self.state.error = None;
+                Command::none()
+            }
+
+            Message::StatusChanged(Err(e)) => {
+                self.state.error = Some(format!("Failed to change status: {}", e));
                 Command::none()
             }
         }

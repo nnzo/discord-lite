@@ -1,5 +1,5 @@
 use crate::api::Message;
-use crate::state::AppState;
+use crate::state::{AppState, UserStatus};
 use crate::Message as AppMessage;
 use iced::widget::{button, column, container, row, scrollable, text, text_input, Column};
 use iced::{Element, Length};
@@ -58,11 +58,70 @@ fn guild_list(state: &AppState) -> Element<AppMessage> {
     let mut header_column = Column::new().spacing(5).padding(10).width(200);
 
     if let Some(user) = &state.current_user {
+        // Username
         header_column = header_column.push(
             text(format!("@{}", user.username))
                 .size(14)
                 .style(iced::Color::from_rgb(0.7, 0.7, 0.7)),
         );
+
+        // Status indicator and button
+        let status_color = state.current_status.color();
+        let status_row = row![
+            text("●").size(16).style(iced::Color::from_rgb(
+                status_color[0],
+                status_color[1],
+                status_color[2]
+            )),
+            button(text(state.current_status.display_name()).size(12))
+                .on_press(AppMessage::ToggleStatusMenu)
+                .padding(4)
+                .style(iced::theme::Button::Secondary),
+        ]
+        .spacing(8)
+        .align_items(iced::Alignment::Center);
+
+        header_column = header_column.push(status_row);
+
+        // Status menu
+        if state.status_menu_open {
+            let mut status_menu = Column::new().spacing(2).width(Length::Fill);
+
+            for status in [
+                UserStatus::Online,
+                UserStatus::Idle,
+                UserStatus::DoNotDisturb,
+                UserStatus::Invisible,
+            ] {
+                let color = status.color();
+                let status_btn = button(
+                    row![
+                        text("●")
+                            .size(14)
+                            .style(iced::Color::from_rgb(color[0], color[1], color[2])),
+                        text(status.display_name()).size(12)
+                    ]
+                    .spacing(8),
+                )
+                .on_press(AppMessage::ChangeStatus(status))
+                .padding(6)
+                .width(Length::Fill)
+                .style(if state.current_status == status {
+                    iced::theme::Button::Primary
+                } else {
+                    iced::theme::Button::Secondary
+                });
+
+                status_menu = status_menu.push(status_btn);
+            }
+
+            header_column = header_column.push(
+                container(status_menu)
+                    .padding(5)
+                    .style(iced::theme::Container::Box),
+            );
+        }
+
         header_column = header_column.push(text("-----------").size(12));
     }
 

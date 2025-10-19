@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 const API_BASE: &str = "https://discord.com/api/v10";
 
+use crate::state::UserStatus;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct User {
     pub id: String,
@@ -61,6 +63,11 @@ pub struct UserSettings {
 #[derive(Debug, Serialize)]
 struct SendMessagePayload {
     content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct StatusPayload {
+    status: String,
 }
 
 pub async fn verify_token(token: String) -> Result<User, String> {
@@ -259,6 +266,28 @@ pub async fn send_message(
 
     if !response.status().is_success() {
         return Err(format!("Failed to send message: {}", response.status()));
+    }
+
+    Ok(())
+}
+
+pub async fn set_status(token: String, status: UserStatus) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let payload = StatusPayload {
+        status: status.as_str().to_string(),
+    };
+
+    let response = client
+        .patch(format!("{}/users/@me/settings", API_BASE))
+        .header("Authorization", token)
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Failed to change status: {}", response.status()));
     }
 
     Ok(())
