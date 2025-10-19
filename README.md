@@ -1,4 +1,4 @@
-# Discord Lite
+# Discord Lite [![Build Status](https://github.com/nnzo/discord-lite/actions/workflows/rust.yml/badge.svg)](https://github.com/nnzo/discord-lite/actions)
 
 A lightweight, minimal Discord client built with Rust and Iced GUI framework. This client focuses on the essentials: viewing servers, channels, and messaging - no bloat, no unnecessary features.
 
