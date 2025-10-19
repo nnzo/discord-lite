@@ -34,6 +34,17 @@ pub enum Message {
     ToggleStatusMenu,
     ChangeStatus(state::UserStatus),
     StatusChanged(Result<(), String>),
+
+    // Profile
+    OpenProfileEditor,
+    CloseProfileEditor,
+    ProfileBioInputChanged(String),
+    ProfileDisplayNameInputChanged(String),
+    SaveProfile,
+    ProfileSaved(Result<(), String>),
+    ViewUserProfile(String),
+    UserProfileLoaded(Result<api::UserProfile, String>),
+    CloseUserProfile,
 }
 
 impl Application for DiscordLite {
@@ -196,6 +207,91 @@ impl Application for DiscordLite {
 
             Message::StatusChanged(Err(e)) => {
                 self.state.error = Some(format!("Failed to change status: {}", e));
+                Command::none()
+            }
+
+            Message::OpenProfileEditor => {
+                // Pre-fill inputs with current values
+                if let Some(user) = &self.state.current_user {
+                    self.state.profile_display_name_input =
+                        user.global_name.clone().unwrap_or_default();
+                    self.state.profile_bio_input = user.bio.clone().unwrap_or_default();
+                }
+                self.state.show_profile_editor = true;
+                Command::none()
+            }
+
+            Message::CloseProfileEditor => {
+                self.state.show_profile_editor = false;
+                Command::none()
+            }
+
+            Message::ProfileBioInputChanged(text) => {
+                self.state.profile_bio_input = text;
+                Command::none()
+            }
+
+            Message::ProfileDisplayNameInputChanged(text) => {
+                self.state.profile_display_name_input = text;
+                Command::none()
+            }
+
+            Message::SaveProfile => {
+                let token = self.state.token.clone().unwrap();
+                let bio = if self.state.profile_bio_input.trim().is_empty() {
+                    None
+                } else {
+                    Some(self.state.profile_bio_input.clone())
+                };
+                let display_name = if self.state.profile_display_name_input.trim().is_empty() {
+                    None
+                } else {
+                    Some(self.state.profile_display_name_input.clone())
+                };
+
+                Command::perform(
+                    api::update_profile(token, bio, display_name),
+                    Message::ProfileSaved,
+                )
+            }
+
+            Message::ProfileSaved(Ok(())) => {
+                self.state.show_profile_editor = false;
+                self.state.error = None;
+
+                // Re-fetch user data to update display
+                let token = self.state.token.clone().unwrap();
+                Command::perform(api::verify_token(token), |result| {
+                    Message::LoginResult(result.map(|user| user))
+                })
+            }
+
+            Message::ProfileSaved(Err(e)) => {
+                self.state.error = Some(format!("Failed to save profile: {}", e));
+                Command::none()
+            }
+
+            Message::ViewUserProfile(user_id) => {
+                let token = self.state.token.clone().unwrap();
+                Command::perform(
+                    api::fetch_user_profile(token, user_id),
+                    Message::UserProfileLoaded,
+                )
+            }
+
+            Message::UserProfileLoaded(Ok(profile)) => {
+                self.state.viewing_user_profile = Some(profile);
+                self.state.error = None;
+                Command::none()
+            }
+
+            Message::UserProfileLoaded(Err(e)) => {
+                self.state.error = Some(format!("Failed to load user profile: {}", e));
+                Command::none()
+            }
+
+            Message::CloseUserProfile => {
+                self.state.viewing_user_profile = None;
                 Command::none()
             }
         }

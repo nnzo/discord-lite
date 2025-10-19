@@ -9,6 +9,16 @@ pub fn view(state: &AppState) -> Element<AppMessage> {
         return login_view(state);
     }
 
+    // Show profile editor overlay if open
+    if state.show_profile_editor {
+        return profile_editor_view(state);
+    }
+
+    // Show user profile overlay if viewing someone
+    if state.viewing_user_profile.is_some() {
+        return user_profile_view(state);
+    }
+
     main_view(state)
 }
 
@@ -58,12 +68,20 @@ fn guild_list(state: &AppState) -> Element<AppMessage> {
     let mut header_column = Column::new().spacing(5).padding(10).width(200);
 
     if let Some(user) = &state.current_user {
-        // Username
-        header_column = header_column.push(
+        // Username with edit button
+        let username_row = row![
             text(format!("@{}", user.username))
                 .size(14)
                 .style(iced::Color::from_rgb(0.7, 0.7, 0.7)),
-        );
+            button(text("✎").size(12))
+                .on_press(AppMessage::OpenProfileEditor)
+                .padding(4)
+                .style(iced::theme::Button::Secondary),
+        ]
+        .spacing(8)
+        .align_items(iced::Alignment::Center);
+
+        header_column = header_column.push(username_row);
 
         // Status indicator and button
         let status_color = state.current_status.color();
@@ -328,15 +346,20 @@ fn chat_view(state: &AppState) -> Element<AppMessage> {
 }
 
 fn message_view(message: &Message) -> Element<AppMessage> {
-    let author_text = text(format!("{}:", message.author.username))
-        .size(14)
-        .style(iced::Color::from_rgb(0.4, 0.7, 1.0));
+    let author_btn = button(
+        text(format!("{}:", message.author.username))
+            .size(14)
+            .style(iced::Color::from_rgb(0.4, 0.7, 1.0)),
+    )
+    .on_press(AppMessage::ViewUserProfile(message.author.id.clone()))
+    .padding(0)
+    .style(iced::theme::Button::Text);
 
     let content_text = text(&message.content).size(14);
 
     let msg_column = column![
         row![
-            author_text,
+            author_btn,
             text(format_timestamp(&message.timestamp))
                 .size(12)
                 .style(iced::Color::from_rgb(0.5, 0.5, 0.5))
@@ -411,4 +434,100 @@ fn render_channel<'a>(
             container(text("")).into()
         }
     }
+}
+
+fn profile_editor_view(state: &AppState) -> Element<AppMessage> {
+    let mut content = column![
+        text("Edit Profile").size(28),
+        text("").size(10),
+        text("Display Name").size(14),
+        text_input("Display Name (optional)", &state.profile_display_name_input)
+            .on_input(AppMessage::ProfileDisplayNameInputChanged)
+            .padding(10)
+            .width(400),
+        text("").size(10),
+        text("Bio").size(14),
+        text_input("Bio (optional)", &state.profile_bio_input)
+            .on_input(AppMessage::ProfileBioInputChanged)
+            .padding(10)
+            .width(400),
+        text("").size(10),
+        row![
+            button("Save").on_press(AppMessage::SaveProfile).padding(10),
+            button("Cancel")
+                .on_press(AppMessage::CloseProfileEditor)
+                .padding(10),
+        ]
+        .spacing(10),
+    ]
+    .spacing(10)
+    .padding(40)
+    .align_items(iced::Alignment::Center);
+
+    if let Some(error) = &state.error {
+        content = content.push(text(error).style(iced::Color::from_rgb(1.0, 0.3, 0.3)));
+    }
+
+    container(content)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x()
+        .center_y()
+        .style(iced::theme::Container::Box)
+        .into()
+}
+
+fn user_profile_view(state: &AppState) -> Element<AppMessage> {
+    let profile = state.viewing_user_profile.as_ref().unwrap();
+    let user = &profile.user;
+
+    let display_name = user
+        .global_name
+        .as_deref()
+        .unwrap_or(&user.username)
+        .to_string();
+
+    let mut content = column![
+        text("User Profile").size(28),
+        text("").size(10),
+        text(display_name).size(24),
+        text(format!("@{}", user.username))
+            .size(16)
+            .style(iced::Color::from_rgb(0.7, 0.7, 0.7)),
+        text("").size(10),
+    ]
+    .spacing(5)
+    .padding(40)
+    .align_items(iced::Alignment::Center);
+
+    if let Some(bio) = &profile.bio {
+        if !bio.trim().is_empty() {
+            content = content.push(text("Bio").size(14));
+            content = content.push(
+                container(text(bio).size(14))
+                    .padding(10)
+                    .width(400)
+                    .style(iced::theme::Container::Box),
+            );
+            content = content.push(text("").size(10));
+        }
+    }
+
+    content = content.push(
+        button("Close")
+            .on_press(AppMessage::CloseUserProfile)
+            .padding(10),
+    );
+
+    if let Some(error) = &state.error {
+        content = content.push(text(error).style(iced::Color::from_rgb(1.0, 0.3, 0.3)));
+    }
+
+    container(content)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x()
+        .center_y()
+        .style(iced::theme::Container::Box)
+        .into()
 }

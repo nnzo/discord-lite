@@ -60,6 +60,12 @@ pub struct AppState {
     pub current_status: UserStatus,
     pub status_menu_open: bool,
 
+    // Profile
+    pub show_profile_editor: bool,
+    pub profile_bio_input: String,
+    pub profile_display_name_input: String,
+    pub viewing_user_profile: Option<crate::api::UserProfile>,
+
     // Error handling
     pub error: Option<String>,
 }
@@ -79,6 +85,10 @@ impl AppState {
             message_input: String::new(),
             current_status: UserStatus::Online,
             status_menu_open: false,
+            show_profile_editor: false,
+            profile_bio_input: String::new(),
+            profile_display_name_input: String::new(),
+            viewing_user_profile: None,
             error: None,
         }
     }

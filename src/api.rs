@@ -11,6 +11,10 @@ pub struct User {
     pub discriminator: String,
     #[serde(default)]
     pub avatar: Option<String>,
+    #[serde(default)]
+    pub bio: Option<String>,
+    #[serde(default)]
+    pub global_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -68,6 +72,21 @@ struct SendMessagePayload {
 #[derive(Debug, Serialize)]
 struct StatusPayload {
     status: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ProfileUpdatePayload {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bio: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    global_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserProfile {
+    pub user: User,
+    #[serde(default)]
+    pub bio: Option<String>,
 }
 
 pub async fn verify_token(token: String) -> Result<User, String> {
@@ -269,6 +288,55 @@ pub async fn send_message(
     }
 
     Ok(())
+}
+
+pub async fn update_profile(
+    token: String,
+    bio: Option<String>,
+    display_name: Option<String>,
+) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let payload = ProfileUpdatePayload {
+        bio,
+        global_name: display_name,
+    };
+
+    let response = client
+        .patch(format!("{}/users/@me", API_BASE))
+        .header("Authorization", token)
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Failed to update profile: {}", response.status()));
+    }
+
+    Ok(())
+}
+
+pub async fn fetch_user_profile(token: String, user_id: String) -> Result<UserProfile, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{}/users/{}/profile", API_BASE, user_id))
+        .header("Authorization", token)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Failed to fetch user profile: {}",
+            response.status()
+        ));
+    }
+
+    response
+        .json::<UserProfile>()
+        .await
+        .map_err(|e| format!("Failed to parse user profile: {}", e))
 }
 
 pub async fn set_status(token: String, status: UserStatus) -> Result<(), String> {
