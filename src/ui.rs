@@ -14,9 +14,9 @@ pub fn view(state: &AppState) -> Element<AppMessage> {
         return profile_editor_view(state);
     }
 
-    // Show user profile overlay if viewing someone
+    // Show user profile as modal dialog overlay
     if state.viewing_user_profile.is_some() {
-        return user_profile_view(state);
+        return user_profile_modal(state);
     }
 
     main_view(state)
@@ -477,7 +477,7 @@ fn profile_editor_view(state: &AppState) -> Element<AppMessage> {
         .into()
 }
 
-fn user_profile_view(state: &AppState) -> Element<AppMessage> {
+fn user_profile_modal(state: &AppState) -> Element<AppMessage> {
     let profile = state.viewing_user_profile.as_ref().unwrap();
     let user = &profile.user;
 
@@ -487,47 +487,64 @@ fn user_profile_view(state: &AppState) -> Element<AppMessage> {
         .unwrap_or(&user.username)
         .to_string();
 
-    let mut content = column![
-        text("User Profile").size(28),
+    let mut modal_content = column![
+        // Header with close button
+        row![
+            text("User Profile").size(20),
+            button(text("✕").size(16))
+                .on_press(AppMessage::CloseUserProfile)
+                .padding(6)
+                .style(iced::theme::Button::Secondary),
+        ]
+        .spacing(180)
+        .width(Length::Fill)
+        .align_items(iced::Alignment::Center),
         text("").size(10),
+        // Display name
         text(display_name).size(24),
+        // Username
         text(format!("@{}", user.username))
-            .size(16)
+            .size(14)
             .style(iced::Color::from_rgb(0.7, 0.7, 0.7)),
-        text("").size(10),
+        text("").size(15),
     ]
     .spacing(5)
-    .padding(40)
+    .padding(25)
+    .width(400)
     .align_items(iced::Alignment::Center);
 
+    // Bio section
     if let Some(bio) = &profile.bio {
         if !bio.trim().is_empty() {
-            content = content.push(text("Bio").size(14));
-            content = content.push(
-                container(text(bio).size(14))
-                    .padding(10)
-                    .width(400)
-                    .style(iced::theme::Container::Box),
+            modal_content = modal_content.push(
+                column![
+                    text("BIO")
+                        .size(12)
+                        .style(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                    text("").size(5),
+                    container(text(bio).size(13))
+                        .padding(12)
+                        .width(Length::Fill)
+                        .style(iced::theme::Container::Box),
+                ]
+                .spacing(2)
+                .width(Length::Fill)
+                .align_items(iced::Alignment::Start),
             );
-            content = content.push(text("").size(10));
+            modal_content = modal_content.push(text("").size(10));
         }
     }
 
-    content = content.push(
-        button("Close")
-            .on_press(AppMessage::CloseUserProfile)
-            .padding(10),
-    );
+    let modal_box = container(modal_content)
+        .style(iced::theme::Container::Box)
+        .width(400)
+        .max_height(500);
 
-    if let Some(error) = &state.error {
-        content = content.push(text(error).style(iced::Color::from_rgb(1.0, 0.3, 0.3)));
-    }
-
-    container(content)
+    // Center the modal dialog
+    container(modal_box)
         .width(Length::Fill)
         .height(Length::Fill)
         .center_x()
         .center_y()
-        .style(iced::theme::Container::Box)
         .into()
 }
