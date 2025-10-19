@@ -63,7 +63,7 @@ fn guild_list(state: &AppState) -> Element<AppMessage> {
                 .size(14)
                 .style(iced::Color::from_rgb(0.7, 0.7, 0.7)),
         );
-        header_column = header_column.push(text("───────────").size(12));
+        header_column = header_column.push(text("-----------").size(12));
     }
 
     header_column = header_column.push(text("Servers").size(18));
@@ -123,7 +123,7 @@ fn channel_list(state: &AppState) -> Element<AppMessage> {
             .unwrap_or("Unknown");
 
         header_column = header_column.push(text(guild_name).size(16));
-        header_column = header_column.push(text("───────────").size(12));
+        header_column = header_column.push(text("-----------").size(12));
         header_column = header_column.push(text("Channels").size(14));
 
         let mut channel_column = Column::new().spacing(5).width(Length::Fill);
